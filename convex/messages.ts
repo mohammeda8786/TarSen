@@ -150,17 +150,36 @@ export const toggleReaction = mutation({
 
         if (!user) throw new Error("User not found");
 
-        const existing = await ctx.db
+        // Enforce one reaction per user per message. If the user already reacted:
+        // - with the same emoji: remove (toggle off)
+        // - with a different emoji: update to the new emoji (show last used)
+        // Collect any reactions this user has on the message (may be multiple
+        // if old data allowed it). We'll handle duplicates safely:
+        // - if a reaction with the same emoji exists -> remove it (toggle off)
+        // - else -> update the first found to the new emoji and remove any extras
+        const existingByUser = await ctx.db
             .query("messageReactions")
             .withIndex("by_messageId", (q) => q.eq("messageId", args.messageId))
-            .filter((q) => q.and(
-                q.eq(q.field("userId"), user._id),
-                q.eq(q.field("emoji"), args.emoji)
-            ))
-            .unique();
+            .filter((q) => q.eq(q.field("userId"), user._id))
+            .collect();
 
-        if (existing) {
-            await ctx.db.delete(existing._id);
+        if (existingByUser.length > 0) {
+            // If there's an exact match, delete that one (toggle off)
+            const exact = existingByUser.find((r: any) => r.emoji === args.emoji);
+            if (exact) {
+                await ctx.db.delete(exact._id);
+                // cleanup any other duplicates just in case
+                for (const dup of existingByUser) {
+                    if (dup._id !== exact._id) await ctx.db.delete(dup._id);
+                }
+            } else {
+                // No exact match: update first record to new emoji and delete the rest
+                const first = existingByUser[0];
+                await ctx.db.patch(first._id, { emoji: args.emoji });
+                for (let i = 1; i < existingByUser.length; i++) {
+                    await ctx.db.delete(existingByUser[i]._id);
+                }
+            }
         } else {
             await ctx.db.insert("messageReactions", {
                 messageId: args.messageId,

@@ -6,7 +6,7 @@ import { useState } from "react";
 import { useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
-import { MessageSquare } from "lucide-react";
+// using image from public/ for Tars branding
 
 export default function Home() {
   const [selectedConversationId, setSelectedConversationId] = useState<Id<"conversations"> | null>(null);
@@ -49,12 +49,12 @@ export default function Home() {
           </div>
         ) : (
           <div className="flex-1 flex flex-col items-center justify-center text-center p-8 bg-[#f0f2f5] border-l border-[#d1d7db]">
-            <div className="h-24 w-24 bg-emerald-100 rounded-full flex items-center justify-center mb-6">
-              <MessageSquare className="h-12 w-12 text-[#00a884]" />
+            <div className="h-24 w-24 bg-violet-100 rounded-full flex items-center justify-center mb-6 overflow-hidden">
+              <img src="/download.png" alt="Tars" className="h-16 w-auto" />
             </div>
-            <h1 className="text-3xl font-light text-[#41525d] mb-4">WhatsApp Web</h1>
+            <h1 className="text-3xl font-light text-[#41525d] mb-4">Tars-Chat Web</h1>
             <p className="text-[#667781] max-w-sm mx-auto text-[14px] leading-relaxed">
-              Send and receive messages without keeping your phone online. Use WhatsApp on up to 4 linked devices and 1 phone at the same time.
+              Send and receive messages without keeping your phone online. Use Tars-Chat on up to 4 linked devices and 1 phone at the same time.
             </p>
             <div className="mt-auto py-8 text-[14px] text-[#8696a0] flex items-center gap-1.5 justify-center opacity-60">
               <span>🔒 End-to-end encrypted</span>

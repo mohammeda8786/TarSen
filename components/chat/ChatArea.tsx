@@ -1,7 +1,7 @@
 import { useQuery, useMutation, usePaginatedQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { useState, useEffect, useRef } from "react";
-import { Send, MoreVertical, Paperclip, Smile, MessageSquare, X, Image as ImageIcon, File as FileIcon, Loader2 } from "lucide-react";
+import { Send, MoreVertical, Paperclip, Smile, X, Image as ImageIcon, File as FileIcon, Loader2 } from "lucide-react";
 import { Id } from "@/convex/_generated/dataModel";
 import { MessageItem } from "@/components/chat/MessageItem";
 import { cn } from "@/lib/utils";
@@ -109,7 +109,7 @@ export function ChatArea({ conversationId }: { conversationId: Id<"conversations
                         {conversation?.otherUser?.imageUrl ? (
                             <img src={conversation.otherUser.imageUrl} alt="" className="h-full w-full object-cover" />
                         ) : (
-                            <MessageSquare className="h-5 w-5 text-gray-500" />
+                            <img src="/download.png" alt="Tars" className="h-5 w-5 text-gray-500" />
                         )}
                     </div>
                     <div className="flex flex-col">
@@ -117,13 +117,13 @@ export function ChatArea({ conversationId }: { conversationId: Id<"conversations
                             {conversation?.isGroup ? conversation.name : conversation?.otherUser?.name || "Chat"}
                         </h2>
                         {typingUsers && typingUsers.length > 0 ? (
-                            <p className="text-[11px] text-[#00a884] font-medium leading-tight">
+                            <p className="text-[11px] text-[#7c3aed] font-medium leading-tight">
                                 {typingUsers.join(", ")} is typing...
                             </p>
                         ) : (
                             <p className="text-[11px] text-[#667781] leading-tight flex items-center gap-1">
                                 {conversation?.otherUser?.isOnline ? (
-                                    <span className="text-[#00a884]">online</span>
+                                    <span className="text-[#7c3aed]">online</span>
                                 ) : "offline"}
                             </p>
                         )}
@@ -179,9 +179,9 @@ export function ChatArea({ conversationId }: { conversationId: Id<"conversations
             <div className="flex flex-col bg-[#f0f2f5] border-t">
                 {/* Reply Preview in Composer */}
                 {replyingTo && (
-                    <div className="px-4 py-2 border-l-4 border-[#00a884] bg-white/50 flex items-center justify-between m-2 rounded-lg">
+                    <div className="px-4 py-2 border-l-4 border-[#7c3aed] bg-white/50 flex items-center justify-between m-2 rounded-lg">
                         <div className="flex flex-col py-1 overflow-hidden">
-                            <span className="text-xs font-bold text-[#00a884]">
+                            <span className="text-xs font-bold text-[#7c3aed]">
                                 Replying to {replyingTo.senderId === currentUser._id ? "yourself" : "contact"}
                             </span>
                             <span className="text-xs text-[#667781] truncate">{replyingTo.content}</span>

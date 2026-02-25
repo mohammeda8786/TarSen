@@ -79,8 +79,8 @@ export function Sidebar({
                         <div className="relative flex-shrink-0">
                             <div className="h-12 w-12 rounded-full bg-gray-200 overflow-hidden flex items-center justify-center">
                                 {conv.isGroup ? (
-                                    <div className="bg-emerald-100 w-full h-full flex items-center justify-center">
-                                        <UserIcon className="h-6 w-6 text-emerald-600" />
+                                    <div className="bg-violet-100 w-full h-full flex items-center justify-center">
+                                        <UserIcon className="h-6 w-6 text-violet-600" />
                                     </div>
                                 ) : (
                                     <img
@@ -91,14 +91,14 @@ export function Sidebar({
                                 )}
                             </div>
                         </div>
-                        <div className="flex-1 min-w-0 pr-1">
+                                <div className="flex-1 min-w-0 pr-1">
                             <div className="flex items-center justify-between mb-0.5">
                                 <h3 className="text-[17px] font-normal text-[#111b21] truncate">
                                     {conv.isGroup ? conv.name : conv.otherUser?.name}
                                 </h3>
                                 <span className={cn(
                                     "text-[12px]",
-                                    conv.unreadCount > 0 ? "text-[#00a884] font-medium" : "text-[#667781]"
+                                            conv.unreadCount > 0 ? "text-[#7c3aed] font-medium" : "text-[#667781]"
                                 )}>
                                     {conv.lastMessage && formatLastMessageTime(conv.lastMessage._creationTime)}
                                 </span>
@@ -108,7 +108,7 @@ export function Sidebar({
                                     {conv.lastMessage?.content || "No messages yet"}
                                 </p>
                                 {conv.unreadCount > 0 && (
-                                    <span className="bg-[#25d366] text-white text-[12px] font-semibold h-5 min-w-[20px] px-1 rounded-full flex items-center justify-center">
+                                            <span className="bg-[#7c3aed] text-white text-[12px] font-semibold h-5 min-w-[20px] px-1 rounded-full flex items-center justify-center">
                                         {conv.unreadCount}
                                     </span>
                                 )}
@@ -137,7 +137,7 @@ export function Sidebar({
                                 <div className="flex-1 text-left min-w-0">
                                     <h3 className="text-[17px] font-normal text-[#111b21] truncate">{user.name}</h3>
                                     <p className="text-[14px] text-[#667781] truncate">
-                                        {user.isOnline ? "Online" : "Hey there! I am using WhatsApp."}
+                                        {user.isOnline ? "Online" : "Tarsense Chat-Live"}
                                     </p>
                                 </div>
                             </button>

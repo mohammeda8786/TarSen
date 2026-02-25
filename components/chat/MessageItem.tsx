@@ -37,7 +37,7 @@ export function MessageItem({ message, isMe }: { message: any; isMe: boolean }) 
                 {message.replyTo && (
                     <div className={cn(
                         "mb-[-8px] px-2 pt-2 pb-3 rounded-t-xl text-xs border-l-4 bg-black/5 flex flex-col gap-0.5",
-                        isMe ? "border-blue-500 mr-2 ml-4" : "border-emerald-500 ml-2 mr-4"
+                        isMe ? "border-blue-500 mr-2 ml-4" : "border-violet-500 ml-2 mr-4"
                     )}>
                         <p className="font-bold opacity-70">
                             {message.replyTo.senderId === message.senderId ? "You" : "Other User"}
@@ -46,12 +46,12 @@ export function MessageItem({ message, isMe }: { message: any; isMe: boolean }) 
                     </div>
                 )}
 
-                <div className={cn(
+                    <div className={cn(
                     "px-3 py-1.5 rounded-2xl shadow-[0_1px_0.5px_rgba(0,0,0,0.13)]",
                     message.isDeleted
                         ? "bg-gray-100 text-gray-400 italic border border-gray-200"
                         : isMe
-                            ? "bg-[#d9fdd3] text-[#111b21]"
+                            ? "bg-[#f2e9ff] text-[#111b21]"
                             : "bg-white text-[#111b21]"
                 )}>
                     {/* Media Rendering */}
