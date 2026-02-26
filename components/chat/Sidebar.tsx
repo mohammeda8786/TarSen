@@ -116,7 +116,6 @@ export function Sidebar({
                         </div>
                     </button>
                 ))}
-
                 {/* Search / Discover */}
                 {(search || (conversations && conversations.length === 0)) && (
                     <div className="divide-y divide-[#f0f2f5]">
@@ -142,6 +141,19 @@ export function Sidebar({
                                 </div>
                             </button>
                         ))}
+
+                        {/* No results helpers */}
+                        {search && users && users.length === 0 && (
+                            <div className="p-6 text-center text-[#667781]">
+                                No users found for "{search}". Try a different name.
+                            </div>
+                        )}
+
+                        {!search && conversations && conversations.length === 0 && (
+                            <div className="p-6 text-center text-[#667781]">
+                                You don't have any conversations yet. Search or start a new chat.
+                            </div>
+                        )}
                     </div>
                 )}
             </div>

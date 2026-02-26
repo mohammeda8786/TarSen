@@ -73,39 +73,61 @@ export const list = query({
         paginationOpts: paginationOptsValidator,
     },
     handler: async (ctx, args) => {
+        const identity = await ctx.auth.getUserIdentity();
+
+        let currentUserId: any = null;
+        if (identity) {
+            const user = await ctx.db
+                .query("users")
+                .withIndex("by_clerkId", (q) => q.eq("clerkId", identity.subject))
+                .unique();
+            currentUserId = user?._id;
+        }
+
         const messagesPage = await ctx.db
             .query("messages")
             .withIndex("by_conversationId", (q) => q.eq("conversationId", args.conversationId))
             .order("desc")
             .paginate(args.paginationOpts);
 
+        const pageItems = await Promise.all(
+            messagesPage.page.map(async (msg) => {
+                // skip if hidden for current user
+                if (currentUserId) {
+                    const hidden = await ctx.db
+                        .query("hiddenMessages")
+                        .withIndex("by_messageId_userId", (q) => q.eq("messageId", msg._id).eq("userId", currentUserId))
+                        .unique();
+                    if (hidden) return null;
+                }
+
+                const reactions = await ctx.db
+                    .query("messageReactions")
+                    .withIndex("by_messageId", (q) => q.eq("messageId", msg._id))
+                    .collect();
+
+                let fileUrl = null;
+                if (msg.storageId) {
+                    fileUrl = await ctx.storage.getUrl(msg.storageId);
+                }
+
+                let replyTo = null;
+                if (msg.replyToId) {
+                    replyTo = await ctx.db.get(msg.replyToId);
+                }
+
+                return {
+                    ...msg,
+                    reactions,
+                    fileUrl,
+                    replyTo,
+                };
+            })
+        );
+
         return {
             ...messagesPage,
-            page: await Promise.all(
-                messagesPage.page.map(async (msg) => {
-                    const reactions = await ctx.db
-                        .query("messageReactions")
-                        .withIndex("by_messageId", (q) => q.eq("messageId", msg._id))
-                        .collect();
-
-                    let fileUrl = null;
-                    if (msg.storageId) {
-                        fileUrl = await ctx.storage.getUrl(msg.storageId);
-                    }
-
-                    let replyTo = null;
-                    if (msg.replyToId) {
-                        replyTo = await ctx.db.get(msg.replyToId);
-                    }
-
-                    return {
-                        ...msg,
-                        reactions,
-                        fileUrl,
-                        replyTo,
-                    };
-                })
-            ),
+            page: pageItems.filter(Boolean),
         };
     },
 });
@@ -134,6 +156,33 @@ export const deleteMessage = mutation({
             content: "This message was deleted",
             isDeleted: true,
         });
+    },
+});
+
+export const hideMessage = mutation({
+    args: { messageId: v.id("messages") },
+    handler: async (ctx, args) => {
+        const identity = await ctx.auth.getUserIdentity();
+        if (!identity) throw new Error("Not authenticated");
+
+        const user = await ctx.db
+            .query("users")
+            .withIndex("by_clerkId", (q) => q.eq("clerkId", identity.subject))
+            .unique();
+
+        if (!user) throw new Error("User not found");
+
+        const existing = await ctx.db
+            .query("hiddenMessages")
+            .withIndex("by_messageId_userId", (q) => q.eq("messageId", args.messageId).eq("userId", user._id))
+            .unique();
+
+        if (!existing) {
+            await ctx.db.insert("hiddenMessages", {
+                messageId: args.messageId,
+                userId: user._id,
+            });
+        }
     },
 });
 
@@ -281,8 +330,8 @@ export const getTyping = query({
             .withIndex("by_conversationId", (q) => q.eq("conversationId", args.conversationId))
             .collect();
 
-        const activeTyping = typing.filter((t) => t.lastUpdate > threshold);
-
+        // Return typing entries with timestamps so clients can locally
+        // decide whether to show them (avoids stale UI when no DB updates).
         let currentUserId: any = null;
         if (identity) {
             const user = await ctx.db
@@ -293,11 +342,14 @@ export const getTyping = query({
         }
 
         return await Promise.all(
-            activeTyping
+            typing
                 .filter((t) => t.userId !== currentUserId)
                 .map(async (t) => {
                     const user = await ctx.db.get(t.userId);
-                    return user?.name || "Unknown";
+                    return {
+                        name: user?.name || "Unknown",
+                        lastUpdate: t.lastUpdate,
+                    };
                 })
         );
     },

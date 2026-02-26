@@ -121,7 +121,16 @@ export const getConversations = query({
                         .withIndex("by_conversationId", (q) => q.eq("conversationId", conv._id))
                         .collect();
                     const otherUserId = otherMembership.find(m => m.userId !== user._id)?.userId;
-                    otherUser = otherUserId ? await ctx.db.get(otherUserId) : null;
+                    if (otherUserId) {
+                        const u = await ctx.db.get(otherUserId);
+                        if (u) {
+                            const ONLINE_THRESHOLD = 60_000;
+                            u.isOnline = (u.lastSeen && Date.now() - u.lastSeen < ONLINE_THRESHOLD) || false;
+                        }
+                        otherUser = u;
+                    } else {
+                        otherUser = null;
+                    }
                 }
 
                 const lastMessage = conv.lastMessageId

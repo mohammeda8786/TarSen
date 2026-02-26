@@ -19,7 +19,9 @@ export function ChatArea({ conversationId }: { conversationId: Id<"conversations
     );
 
     const conversation = useQuery(api.conversations.getConversations)?.find(c => c._id === conversationId);
-    const typingUsers = useQuery(api.messages.getTyping, { conversationId });
+    const typingEntries = useQuery(api.messages.getTyping, { conversationId }) as
+        | { name: string; lastUpdate: number }[]
+        | undefined;
     const send = useMutation(api.messages.send);
     const generateUploadUrl = useMutation(api.messages.generateUploadUrl);
     const markRead = useMutation(api.messages.markRead);
@@ -29,6 +31,8 @@ export function ChatArea({ conversationId }: { conversationId: Id<"conversations
     const scrollRef = useRef<HTMLDivElement>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
     const [isAtBottom, setIsAtBottom] = useState(true);
+    const [newMessagesCount, setNewMessagesCount] = useState(0);
+    const [sendError, setSendError] = useState<string | null>(null);
 
     useEffect(() => {
         if (!content.trim()) return;
@@ -37,6 +41,29 @@ export function ChatArea({ conversationId }: { conversationId: Id<"conversations
         }, 500);
         return () => clearTimeout(timeout);
     }, [content, conversationId, setTyping]);
+
+    // Local tick to force re-render so stale typing indicators can be hidden
+    // without relying on DB updates. Runs every 1s.
+    const [, setTick] = useState(0);
+    useEffect(() => {
+        const id = setInterval(() => setTick((t) => t + 1), 1000);
+        return () => clearInterval(id);
+    }, []);
+
+    // Normalize typing entries and compute currently active typers.
+    const activeTypers = (() => {
+        const threshold = Date.now() - 3000; // 3s
+        if (!typingEntries || typingEntries.length === 0) return [] as string[];
+        return typingEntries
+            .map((t: any) => {
+                if (!t) return null;
+                if (typeof t === "string") return { name: t, lastUpdate: Date.now() };
+                return { name: t.name || "Unknown", lastUpdate: Number(t.lastUpdate) || 0 };
+            })
+            .filter(Boolean)
+            .filter((t: any) => t.lastUpdate > threshold)
+            .map((t: any) => t.name);
+    })();
 
     useEffect(() => {
         markRead({ conversationId });
@@ -48,7 +75,19 @@ export function ChatArea({ conversationId }: { conversationId: Id<"conversations
                 top: scrollRef.current.scrollHeight,
                 behavior: "smooth",
             });
+            // clear any new messages indicator
+            setNewMessagesCount(0);
         }
+    }, [messages, isAtBottom]);
+
+    // increment new message counter when new messages arrive while scrolled up
+    const prevMessagesLenRef = useRef<number>(0);
+    useEffect(() => {
+        const len = messages?.length || 0;
+        if (prevMessagesLenRef.current && len > prevMessagesLenRef.current && !isAtBottom) {
+            setNewMessagesCount((c) => c + (len - prevMessagesLenRef.current));
+        }
+        prevMessagesLenRef.current = len;
     }, [messages, isAtBottom]);
 
     const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -68,6 +107,7 @@ export function ChatArea({ conversationId }: { conversationId: Id<"conversations
         if (!content.trim() && !previewFile) return;
 
         setUploading(true);
+        setSendError(null);
         let storageId = undefined;
         let type: "text" | "image" | "file" = "text";
 
@@ -83,19 +123,24 @@ export function ChatArea({ conversationId }: { conversationId: Id<"conversations
             type = previewFile.type;
         }
 
-        await send({
+        try {
+            await send({
             conversationId,
             content: content.trim() || (type === "image" ? "📷 Image" : "📄 File"),
             type,
             storageId,
             replyToId: replyingTo?._id,
         });
-
-        setContent("");
-        setPreviewFile(null);
-        setReplyingTo(null);
-        setUploading(false);
-        setIsAtBottom(true);
+            setContent("");
+            setPreviewFile(null);
+            setReplyingTo(null);
+            setUploading(false);
+            setIsAtBottom(true);
+        } catch (err: any) {
+            console.error("Send failed", err);
+            setSendError(err?.message || "Failed to send message");
+            setUploading(false);
+        }
     };
 
     if (!currentUser) return null;
@@ -112,13 +157,29 @@ export function ChatArea({ conversationId }: { conversationId: Id<"conversations
                             <img src="/download.png" alt="Tars" className="h-5 w-5 text-gray-500" />
                         )}
                     </div>
+
+                        {/* New messages indicator */}
+                        {newMessagesCount > 0 && (
+                            <div className="absolute left-1/2 transform -translate-x-1/2 bottom-24 z-40">
+                                <button
+                                    onClick={() => {
+                                        scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
+                                        setIsAtBottom(true);
+                                        setNewMessagesCount(0);
+                                    }}
+                                    className="bg-[#7c3aed] text-white px-3 py-1 rounded-full shadow-md"
+                                >
+                                    ↓ {newMessagesCount} New message{newMessagesCount > 1 ? "s" : ""}
+                                </button>
+                            </div>
+                        )}
                     <div className="flex flex-col">
                         <h2 className="font-semibold text-[#111b21] leading-tight">
                             {conversation?.isGroup ? conversation.name : conversation?.otherUser?.name || "Chat"}
                         </h2>
-                        {typingUsers && typingUsers.length > 0 ? (
+                        {activeTypers.length > 0 ? (
                             <p className="text-[11px] text-[#7c3aed] font-medium leading-tight">
-                                {typingUsers.join(", ")} is typing...
+                                {activeTypers.join(", ")} {activeTypers.length > 1 ? "are" : "is"} typing...
                             </p>
                         ) : (
                             <p className="text-[11px] text-[#667781] leading-tight flex items-center gap-1">
@@ -153,11 +214,11 @@ export function ChatArea({ conversationId }: { conversationId: Id<"conversations
             >
                 <div className="h-2" /> {/* Bottom spacer */}
 
-                {messages?.map((msg) => (
-                    <div key={msg._id} onDoubleClick={() => setReplyingTo(msg)}>
+                {messages?.filter(Boolean).map((msg) => (
+                    <div key={msg!._id} onDoubleClick={() => setReplyingTo(msg)}>
                         <MessageItem
                             message={msg}
-                            isMe={msg.senderId === currentUser._id}
+                            isMe={msg!.senderId === currentUser._id}
                         />
                     </div>
                 ))}
@@ -251,6 +312,16 @@ export function ChatArea({ conversationId }: { conversationId: Id<"conversations
                         </button>
                     </form>
                 </div>
+
+                {sendError && (
+                    <div className="p-3 bg-red-50 border-t border-red-100 text-red-700 flex items-center justify-between">
+                        <span>{sendError}</span>
+                        <div className="flex items-center gap-2">
+                            <button onClick={(e) => handleSend(e as any)} className="px-3 py-1 bg-red-600 text-white rounded">Retry</button>
+                            <button onClick={() => setSendError(null)} className="px-3 py-1 bg-white border rounded">Dismiss</button>
+                        </div>
+                    </div>
+                )}
             </div>
         </div>
     );

@@ -59,6 +59,13 @@ export const getUsers = query({
 
         let users = await ctx.db.query("users").collect();
 
+        // Compute online status from lastSeen to avoid stale isOnline flags
+        const ONLINE_THRESHOLD = 60_000; // 60 seconds
+        users = users.map((u: any) => ({
+            ...u,
+            isOnline: (u.lastSeen && Date.now() - u.lastSeen < ONLINE_THRESHOLD) || false,
+        }));
+
         if (args.search) {
             const searchLower = args.search.toLowerCase();
             users = users.filter((u) => u.name.toLowerCase().includes(searchLower));
@@ -93,10 +100,17 @@ export const getMe = query({
         const identity = await ctx.auth.getUserIdentity();
         if (!identity) return null;
 
-        return await (ctx.db
+        const user = await (ctx.db
             .query("users") as any)
             .withIndex("by_clerkId", (q: any) => q.eq("clerkId", identity.subject))
             .unique();
+
+        if (!user) return null;
+        const ONLINE_THRESHOLD = 60_000;
+        return {
+            ...user,
+            isOnline: (user.lastSeen && Date.now() - user.lastSeen < ONLINE_THRESHOLD) || false,
+        };
     },
 });
 

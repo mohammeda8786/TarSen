@@ -19,6 +19,7 @@ export const metadata: Metadata = {
 
 import { ConvexClientProvider } from "@/components/providers/ConvexClientProvider";
 import { SyncUser } from "@/components/SyncUser";
+import { OnlineStatus } from "@/components/OnlineStatus";
 
 export default function RootLayout({
   children,
@@ -32,6 +33,7 @@ export default function RootLayout({
       >
         <ConvexClientProvider>
           <SyncUser />
+          <OnlineStatus />
           {children}
         </ConvexClientProvider>
       </body>

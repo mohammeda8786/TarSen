@@ -1,9 +1,10 @@
 "use client";
 
 import { format, isToday, isYesterday, isThisYear } from "date-fns";
+import { useState } from "react";
 import { useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
-import { Trash2, Heart, Smile, ThumbsUp, AlertCircle, Check, CheckCheck, FileText, ExternalLink } from "lucide-react";
+import { Trash, Trash2, Heart, Smile, ThumbsUp, AlertCircle, Check, CheckCheck, FileText, ExternalLink, Loader2, EyeOff } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const EMOJIS = ["👍", "❤️", "😂", "😮", "😢"];
@@ -11,6 +12,9 @@ const EMOJIS = ["👍", "❤️", "😂", "😮", "😢"];
 export function MessageItem({ message, isMe }: { message: any; isMe: boolean }) {
     const toggleReaction = useMutation(api.messages.toggleReaction);
     const deleteMessage = useMutation(api.messages.deleteMessage);
+    const hideMessage = useMutation(api.messages.hideMessage);
+    const [isDeleting, setIsDeleting] = useState(false);
+    const [isHiding, setIsHiding] = useState(false);
 
     const formatTime = (timestamp: number) => {
         const date = new Date(timestamp);
@@ -26,7 +30,8 @@ export function MessageItem({ message, isMe }: { message: any; isMe: boolean }) 
 
     const isImage = message.type === "image";
     const isFile = message.type === "file";
-
+    // If a message was deleted, render nothing (completely hidden)
+    if (message.isDeleted) return null;
     return (
         <div className={cn("flex flex-col gap-0.5 w-full", isMe ? "items-end" : "items-start")}>
             <div className={cn(
@@ -76,22 +81,75 @@ export function MessageItem({ message, isMe }: { message: any; isMe: boolean }) 
                     )}
 
                     <div className="flex flex-wrap items-end gap-x-2 gap-y-1">
-                        <p className={cn(
-                            "text-[14.2px] leading-[19px] whitespace-pre-wrap flex-1 min-w-[60px]",
-                            message.isDeleted && "italic text-gray-400"
-                        )}>
-                            {message.content}
-                            {message.isEdited && <span className="text-[10px] opacity-50 ml-1">(edited)</span>}
-                        </p>
+                        {message.isDeleted ? (
+                            // show a neutral background bubble placeholder for deleted messages
+                            <div className={cn(
+                                "rounded-2xl",
+                                isMe ? "bg-gray-100 h-6 w-28" : "bg-gray-200 h-6 w-28"
+                            )} />
+                        ) : (
+                            <>
+                                <p className={cn(
+                                    "text-[14.2px] leading-[19px] whitespace-pre-wrap flex-1 min-w-[60px]"
+                                )}>
+                                    {message.content}
+                                    {message.isEdited && <span className="text-[10px] opacity-50 ml-1">(edited)</span>}
+                                </p>
 
-                        <div className="flex items-center gap-1 h-[15px] mb-[-2px] ml-auto">
-                            <span className="text-[10.5px] text-[#667781] leading-none uppercase">
-                                {formatTime(message._creationTime)}
-                            </span>
-                            {isMe && !message.isDeleted && (
-                                <CheckCheck className="h-[15px] w-[15px] text-[#53bdeb]" />
-                            )}
-                        </div>
+                                <div className="flex items-center gap-1 h-[15px] mb-[-2px] ml-auto">
+                                    <span className="text-[10.5px] text-[#667781] leading-none uppercase">
+                                        {formatTime(message._creationTime)}
+                                    </span>
+                                    {isMe && (
+                                        <>
+                                            <button
+                                                onClick={async () => {
+                                                    const ok = window.confirm("Delete this message for everyone?");
+                                                    if (!ok) return;
+                                                    try {
+                                                        setIsDeleting(true);
+                                                        await deleteMessage({ messageId: message._id });
+                                                    } catch (err: any) {
+                                                        console.error("Delete failed", err);
+                                                        alert(err?.message || "Failed to delete message");
+                                                    } finally {
+                                                        setIsDeleting(false);
+                                                    }
+                                                }}
+                                                title="Delete message for everyone"
+                                                className="ml-2 p-2 rounded-full text-red-600 hover:bg-red-50 flex items-center justify-center transition-colors"
+                                            >
+                                                {isDeleting ? (
+                                                    <Loader2 className="h-4 w-4 animate-spin" />
+                                                ) : (
+                                                    <Trash2 className="h-4 w-4" />
+                                                )}
+                                            </button>
+                                            <CheckCheck className="h-[15px] w-[15px] text-[#53bdeb] ml-1" />
+                                        </>
+                                    )}
+                                    {/* Hide for me button visible to all users */}
+                                    <button
+                                        onClick={async () => {
+                                            try {
+                                                if (isHiding) return;
+                                                setIsHiding(true);
+                                                await hideMessage({ messageId: message._id });
+                                            } catch (err: any) {
+                                                console.error("Hide failed", err);
+                                                alert(err?.message || "Failed to hide message");
+                                            } finally {
+                                                setIsHiding(false);
+                                            }
+                                        }}
+                                        title="Hide message for me"
+                                        className="ml-2 p-1 rounded-full bg-gray-100 text-gray-700 hover:bg-gray-200 flex items-center justify-center"
+                                    >
+                                        {isHiding ? <Loader2 className="h-3 w-3 animate-spin" /> : <EyeOff className="h-3.5 w-3.5" />}
+                                    </button>
+                                </div>
+                            </>
+                        )}
                     </div>
 
                     {/* Reactions List */}
@@ -115,6 +173,22 @@ export function MessageItem({ message, isMe }: { message: any; isMe: boolean }) 
                         "absolute -top-10 opacity-0 group-hover:opacity-100 transition-all duration-200 flex items-center gap-1 bg-white border border-gray-100 shadow-xl rounded-full px-1.5 py-1 z-30",
                         isMe ? "right-0" : "left-0"
                     )}>
+                        {isMe && (
+                            <button
+                                onClick={() => {
+                                    const ok = window.confirm("Delete this message for everyone?");
+                                    if (!ok) return;
+                                    deleteMessage({ messageId: message._id }).catch((err) => {
+                                        console.error(err);
+                                        alert(err?.message || "Failed to delete message");
+                                    });
+                                }}
+                                className="p-2 rounded-full bg-red-50 hover:bg-red-100 text-red-600 shadow-sm"
+                                title="Delete for everyone"
+                            >
+                                <Trash className="h-4 w-4" />
+                            </button>
+                        )}
                         {EMOJIS.map(emoji => (
                             <button
                                 key={emoji}

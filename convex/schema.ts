@@ -46,6 +46,14 @@ export default defineSchema({
     emoji: v.string(),
   }).index("by_messageId", ["messageId"]),
 
+  hiddenMessages: defineTable({
+    messageId: v.id("messages"),
+    userId: v.id("users"),
+  })
+    .index("by_messageId", ["messageId"]) 
+    .index("by_messageId_userId", ["messageId", "userId"]) 
+    .index("by_userId", ["userId"]),
+
   messageReads: defineTable({
     messageId: v.id("messages"),
     userId: v.id("users"),
