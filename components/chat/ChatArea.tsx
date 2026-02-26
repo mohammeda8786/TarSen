@@ -34,25 +34,57 @@ export function ChatArea({ conversationId }: { conversationId: Id<"conversations
     const [newMessagesCount, setNewMessagesCount] = useState(0);
     const [sendError, setSendError] = useState<string | null>(null);
 
+    // When the user is typing, notify the server periodically.  We debounce
+    // the input updates and also throttle the outgoing mutation so we don't
+    // flood the backend while the user is hammering the keyboard.  The goal is
+    // roughly "send once every 2–3 seconds while the field isn't empty".  The
+    // server already drops entries older than 3s, so this keeps the UI
+    // responsive without excessive RPCs.
+    const lastTypingSentRef = useRef<number>(0);
+    // remember previous content so we can send immediately on first keystroke
+    const prevContentRef = useRef<string>(content);
     useEffect(() => {
-        if (!content.trim()) return;
+        const text = content.trim();
+        if (!text) {
+            prevContentRef.current = text;
+            return;
+        }
+
+        const now = Date.now();
+        // send immediately when we go from empty to non-empty or on first send
+        const isFirst = lastTypingSentRef.current === 0;
+        if (isFirst || prevContentRef.current === "") {
+            setTyping({ conversationId });
+            lastTypingSentRef.current = now;
+            prevContentRef.current = text;
+            return;
+        }
+        // otherwise throttle to once every 2 seconds
+        if (now - lastTypingSentRef.current < 2000) {
+            prevContentRef.current = text;
+            return;
+        }
+
         const timeout = setTimeout(() => {
             setTyping({ conversationId });
-        }, 500);
+            lastTypingSentRef.current = Date.now();
+            prevContentRef.current = text;
+        }, 200); // shorter debounce for subsequent updates
         return () => clearTimeout(timeout);
     }, [content, conversationId, setTyping]);
 
     // Local tick to force re-render so stale typing indicators can be hidden
-    // without relying on DB updates. Runs every 1s.
+    // without relying on DB updates. Runs every 500ms for snappier UI.
     const [, setTick] = useState(0);
     useEffect(() => {
-        const id = setInterval(() => setTick((t) => t + 1), 1000);
+        const id = setInterval(() => setTick((t) => t + 1), 500);
         return () => clearInterval(id);
     }, []);
 
     // Normalize typing entries and compute currently active typers.
     const activeTypers = (() => {
-        const threshold = Date.now() - 3000; // 3s
+        // use a 2‑second expiration; server updates at most every 2s now.
+        const threshold = Date.now() - 2000;
         if (!typingEntries || typingEntries.length === 0) return [] as string[];
         return typingEntries
             .map((t: any) => {
